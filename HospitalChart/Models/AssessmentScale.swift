@@ -126,7 +126,9 @@ enum ScaleType: String, Codable, CaseIterable {
 
     var maxScore: Int {
         switch self {
-        case .nds, .nas, .nss: return 100  // 표준점수(T) 근사
+        case .nds:   return 36   // 12문항 × 0~3 (국립정신건강센터 지침서)
+        case .nas:   return 33   // 11문항 × 0~3
+        case .nss:   return 33   // 11문항 × 0~3
         case .phq9:  return 27
         case .gad7:  return 21
         case .phq15: return 30
@@ -203,11 +205,25 @@ enum ScaleType: String, Codable, CaseIterable {
             case 10..<20: return .moderate
             default:      return .severe
             }
-        case .nds, .nas, .nss:
-            switch score {   // 표준점수 T 기준 근사
-            case ..<55:   return .none
-            case 55..<65: return .mild
-            case 65..<75: return .moderate
+        // 한국인 정신건강 척도 — 국립정신건강센터 공식 절단점
+        case .nds:       // 우울: 정상 0–8 / 경증 9–18 / 중등도 19–28 / 중증 29–36
+            switch score {
+            case ..<9:    return .none
+            case 9..<19:  return .mild
+            case 19..<29: return .moderate
+            default:      return .severe
+            }
+        case .nas:       // 불안: 정상 0–9 / 경증 10–16 / 중등도 17–24 / 중증 25–33
+            switch score {
+            case ..<10:   return .none
+            case 10..<17: return .mild
+            case 17..<25: return .moderate
+            default:      return .severe
+            }
+        case .nss:       // 스트레스: 낮음 0–10 / 중등도이상 11–20 / 중증 21–33 (경증 밴드 없음)
+            switch score {
+            case ..<11:   return .none
+            case 11..<21: return .moderate
             default:      return .severe
             }
         }

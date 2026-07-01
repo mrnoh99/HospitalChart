@@ -12,6 +12,9 @@ struct AssessmentView: View {
     let patient: Patient
     let scales: [AssessmentScale]
     var onSendLink: (ScaleType) -> Void = { _ in }
+    var onReload: () -> Void = {}
+
+    @State private var entryScale: NationalScale?
 
     // 척도별로 그룹핑 → 최신순 정렬
     private var byType: [(type: ScaleType, items: [AssessmentScale])] {
@@ -23,8 +26,8 @@ struct AssessmentView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                // 웹링크 발송 바
-                ScaleSendBar(onSend: onSendLink)
+                // 발송·직접시행 바
+                ScaleSendBar(onSend: onSendLink, onEnter: { entryScale = $0 })
 
                 if scales.isEmpty {
                     ContentUnavailableView("척도검사 없음", systemImage: "list.clipboard",
@@ -38,19 +41,35 @@ struct AssessmentView: View {
             }
             .padding(16)
         }
+        .sheet(item: $entryScale) { scale in
+            ScaleEntryView(patient: patient, scale: scale, onSaved: onReload)
+                .environmentObject(vm)
+        }
     }
 }
 
-// 척도 발송 바 — 진료실 밖 자가응답용 웹링크
+// 척도 발송·직접시행 바
 struct ScaleSendBar: View {
     var onSend: (ScaleType) -> Void
+    var onEnter: (NationalScale) -> Void
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "paperplane")
+            Image(systemName: "list.clipboard")
                 .foregroundStyle(AppColor.accent)
-            Text("척도검사 발송")
+            Text("척도검사")
                 .font(.subheadline.bold())
             Spacer()
+            // 한국인 정신건강 척도 직접 시행 (문항 입력·자동 해석)
+            Menu {
+                ForEach(NationalScale.allCases) { scale in
+                    Button(scale.title) { onEnter(scale) }
+                }
+            } label: {
+                Label("직접 시행", systemImage: "square.and.pencil")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            // 진료실 밖 자가응답용 웹링크
             Menu {
                 ForEach(ScaleType.allCases, id: \.self) { type in
                     Button(type.label) { onSend(type) }

@@ -30,8 +30,8 @@ join (values
   ('2025-000001','PHQ-9', now() - interval '2 days',  8,  'tablet',  'completed',
    'PHQ-9 8점(경도). 지속적 호전. 유지 치료 및 재발 예방 교육 권고.'),
   ('2025-000001','GAD-7', now() - interval '2 days',  6,  'tablet',  'completed', null),
-  ('2025-000002','NDS',   now() - interval '5 days',  72, 'interview','reviewed',
-   '한국인 우울 척도 72점(중증). 입원 유지 및 정기 심사 대상.')
+  ('2025-000002','NDS',   now() - interval '5 days',  31, 'interview','reviewed',
+   '한국인 우울 척도(NDS) 31/36점 — 중증 우울장애. 입원 유지 및 정기 심사 대상.')
 ) as v(chart_number, scale_type, administered_at, raw_score, method, status, ai_summary)
   on p.chart_number = v.chart_number
 on conflict do nothing;

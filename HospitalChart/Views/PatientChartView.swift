@@ -35,9 +35,9 @@ struct PatientChartView: View {
             case .chart:
                 ChartRecordListView(records: records, patient: patient)
             case .assessment:
-                AssessmentView(patient: patient, scales: scales) { type in
-                    Task { await sendLink(type) }
-                }
+                AssessmentView(patient: patient, scales: scales,
+                               onSendLink: { type in Task { await sendLink(type) } },
+                               onReload: { Task { await reloadScales() } })
             case .admission:
                 AdmissionView(patient: patient, admissions: admissions)
             case .prescription:
@@ -75,6 +75,10 @@ struct PatientChartView: View {
     // 척도검사 웹링크 발송 (진료실 밖 자가응답)
     private func sendLink(_ type: ScaleType) async {
         _ = try? await HospitalRepository.shared.sendScaleLink(patientId: patient.id, type: type)
+        await reloadScales()
+    }
+
+    private func reloadScales() async {
         scales = (try? await HospitalRepository.shared.fetchAssessments(patientId: patient.id)) ?? scales
     }
 
