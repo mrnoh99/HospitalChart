@@ -188,6 +188,28 @@ create table if not exists prescriptions (
 );
 
 -- =====================================================
+-- 척도검사 (심리척도) — TrueDoc Mental 참조 핵심 기능
+-- 환자 자가응답(웹링크/태블릿) → 실시간 점수 + 재방문 비교 + AI 요약
+-- =====================================================
+create table if not exists assessment_scales (
+  id               uuid primary key default gen_random_uuid(),
+  patient_id       uuid not null references patients(id),
+  chart_record_id  uuid references chart_records(id),
+  scale_type       text not null,             -- NDS, NAS, NSS, PHQ-9, GAD-7 ...
+  administered_at  timestamptz not null default now(),
+  raw_score        int not null default 0,    -- 총점
+  subscores        jsonb not null default '{}',
+  method           text not null default 'web_link'
+                   check (method in ('tablet','web_link','paper','interview')),
+  status           text not null default 'sent'
+                   check (status in ('sent','completed','reviewed')),
+  ai_summary       text,                       -- 생성형 AI 결과 요약 (TrueDoc Mental 최초 도입)
+  administered_by  uuid references staff_profiles(id),
+  created_at       timestamptz not null default now()
+);
+create index if not exists idx_scales_patient on assessment_scales(patient_id, administered_at desc);
+
+-- =====================================================
 -- 환자 동의 이력 (개인정보보호법)
 -- =====================================================
 create table if not exists patient_consents (

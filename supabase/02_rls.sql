@@ -7,6 +7,7 @@ alter table chart_records    enable row level security;
 alter table admissions       enable row level security;
 alter table admission_reviews enable row level security;
 alter table prescriptions    enable row level security;
+alter table assessment_scales enable row level security;
 alter table patient_consents enable row level security;
 
 -- 헬퍼: 현재 사용자 역할
@@ -90,6 +91,20 @@ create policy "처방_서명" on prescriptions for update
 
 -- 처방 취소 시 취소 상태로만 변경 (물리 삭제 금지)
 create policy "처방_삭제_금지" on prescriptions for delete
+  using (false);
+
+-- [assessment_scales] 척도검사 — 차트 열람 가능 직원만
+create policy "척도_조회" on assessment_scales for select
+  using (can_view_charts());
+
+create policy "척도_등록" on assessment_scales for insert
+  with check (can_view_charts());
+
+create policy "척도_수정" on assessment_scales for update
+  using (can_view_charts());
+
+-- 척도검사도 진료 보조기록 → 물리 삭제 금지 (의료법 §22)
+create policy "척도_삭제_금지" on assessment_scales for delete
   using (false);
 
 -- [patient_consents]

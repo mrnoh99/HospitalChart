@@ -27,15 +27,18 @@
 ```
 HospitalChart/
   App/           HospitalChartApp.swift (진입점·인증)
-  Models/        Patient · ChartRecord · Admission · Prescription
+  Models/        Patient · ChartRecord · Admission · Prescription · AssessmentScale
   Views/         LoginView · MainWindowView · PatientListView
-                 PatientChartView · AdmissionView · PrescriptionView
+                 PatientChartView · TimelineView · AssessmentView · AdmissionView
   ViewModel/     HospitalViewModel (ObservableObject)
   Supabase/      SupabaseClient · HospitalRepository
   Design/        AppDesign (색상·폰트·공통 컴포넌트)
 supabase/        01_schema → 02_rls → 03_audit_log → 04_seeds 순 실행
 docs/            의료법_준수사항.md
 ```
+
+### 진료차트 탭 순서 (PatientChartView)
+`타임라인`(기본) · `진료기록`(SOAP) · `척도검사` · `입원` · `처방` · `심리`
 
 ## 사용자 역할 (staff_role)
 | 역할 | 설명 | 주요 권한 |
@@ -47,6 +50,21 @@ docs/            의료법_준수사항.md
 | pa | PA | 지정 범위 내 접근 |
 | psychologist | 심리사 | 심리평가 기록 |
 | secretary | 비서 | 예약·행정 (차트 열람 불가) |
+
+## 진료차트 설계 — TrueDoc Mental 참조
+정신건강의학과 특화 클라우드 EMR **트루닥 멘탈(TrueDoc Mental)**의 진료차트 UX를 참조.
+| 참조 기능 | 구현 |
+|-----------|------|
+| **시간순 통합 배열** (진료·검사·처방을 한 시간축) | `Views/TimelineView.swift` — `.timeline` 탭(기본) |
+| **척도검사** (환자 자가응답, 실시간 점수) | `Models/AssessmentScale.swift` + `Views/AssessmentView.swift` — `.assessment` 탭 |
+| **웹링크 발송** (진료실 밖 스마트폰/PC 응답) | `sendScaleLink()` · `method=web_link` |
+| **재방문 과거 비교** (추세) | `ScaleCard` 추세 표시 + `ScaleHistoryRow` |
+| **생성형 AI 결과 요약** | `assessment_scales.ai_summary` 필드 + 보라색 요약 카드 |
+| **반복 처방 빠른 입력** | `repeatLastPrescription()` — 직전 처방 복제(미서명 draft) |
+| **통합 점수 화면** (척도별 심각도 색상) | `AssessmentView` 카드 + 점수 막대 |
+
+- 척도 종류: 한국형 국가척도(NDS/NAS/NSS) + 국제표준(PHQ-9·GAD-7·PHQ-15·PDSS·Y-BOCS·ISI·AUDIT-K·MDQ·K-MMSE). 절단점 기반 심각도 자동 판정(`ScaleType.severity`).
+- 척도검사도 진료 보조기록 → **물리 삭제 금지**(의료법 §22, RLS `false`) + `audit_log` 자동 기록(§23).
 
 ## 핵심 도메인 규칙
 - 진료기록 삭제: `is_deleted = true` 처리 (DELETE RLS로 거부)

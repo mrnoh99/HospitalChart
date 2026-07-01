@@ -7,7 +7,7 @@ class HospitalViewModel: ObservableObject {
     @Published var currentStaff: StaffProfile?
     @Published var patients: [Patient] = []
     @Published var selectedPatient: Patient?
-    @Published var selectedTab: ChartTab = .chart
+    @Published var selectedTab: ChartTab = .timeline
     @Published var searchText = ""
     @Published var statusFilter: Patient.AdmissionStatus? = nil
     @Published var reviewsDueToday: [Admission] = []
@@ -17,14 +17,18 @@ class HospitalViewModel: ObservableObject {
     private let repo = HospitalRepository.shared
 
     enum ChartTab: String, CaseIterable {
+        case timeline = "timeline"     // 시간순 통합 뷰 (TrueDoc Mental 참조)
         case chart = "chart"
+        case assessment = "assessment" // 척도검사 (TrueDoc Mental 참조)
         case admission = "admission"
         case prescription = "prescription"
         case psychology = "psychology"
 
         var label: String {
             switch self {
+            case .timeline:     return "타임라인"
             case .chart:        return "진료기록"
+            case .assessment:   return "척도검사"
             case .admission:    return "입원"
             case .prescription: return "처방"
             case .psychology:   return "심리"
@@ -32,7 +36,9 @@ class HospitalViewModel: ObservableObject {
         }
         var icon: String {
             switch self {
+            case .timeline:     return "chart.line.uptrend.xyaxis"
             case .chart:        return "doc.text"
+            case .assessment:   return "list.clipboard"
             case .admission:    return "bed.double"
             case .prescription: return "pills"
             case .psychology:   return "brain.head.profile"
@@ -92,7 +98,7 @@ class HospitalViewModel: ObservableObject {
 
     func selectPatient(_ patient: Patient) {
         selectedPatient = patient
-        selectedTab = .chart
+        selectedTab = .timeline
     }
 
     // 비서는 차트 열람 불가

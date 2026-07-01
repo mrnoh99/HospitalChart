@@ -42,6 +42,10 @@ create trigger audit_prescriptions
   after insert or update on prescriptions
   for each row execute procedure log_chart_access();
 
+create trigger audit_assessment_scales
+  after insert or update on assessment_scales
+  for each row execute procedure log_chart_access();
+
 -- 환자 조회 기록 RPC (클라이언트가 환자 열람 시 호출)
 create or replace function log_patient_view(patient_id uuid)
 returns void language plpgsql security definer as $$

@@ -172,6 +172,65 @@ class HospitalRepository {
             .execute()
     }
 
+    // 과거 처방 반복 (TrueDoc Mental: 반복 진료·처방 드래그앤드롭 입력 참조)
+    // 가장 최근 서명 처방을 복제해 새 draft 처방으로 생성 → 만성질환 재방문 시 시간 절약.
+    func repeatLastPrescription(patientId: UUID, prescriberId: UUID) async throws -> Prescription? {
+        let past = try await fetchPrescriptions(patientId: patientId)
+        guard let last = past.first(where: { $0.status != .cancelled }) else { return nil }
+        let copy = Prescription(
+            id: UUID(),
+            patient_id: patientId,
+            chart_record_id: nil,
+            prescriber_id: prescriberId,
+            prescribed_at: Date(),
+            status: .draft,               // 반드시 재서명 필요 (의료법 §23)
+            signed_at: nil,
+            medications: last.medications.map {
+                MedicationItem(id: UUID(), drug_name: $0.drug_name,
+                               generic_name: $0.generic_name, dose: $0.dose,
+                               route: $0.route, frequency: $0.frequency,
+                               days: $0.days, total_quantity: $0.total_quantity,
+                               notes: $0.notes)
+            },
+            special_instructions: last.special_instructions,
+            dispensed_at: nil, dispensed_by: nil,
+            created_at: Date()
+        )
+        return try await createPrescription(copy)
+    }
+
+    // MARK: - 척도검사 (TrueDoc Mental 참조 핵심 기능)
+
+    func fetchAssessments(patientId: UUID) async throws -> [AssessmentScale] {
+        try await supabase.from("assessment_scales")
+            .select()
+            .eq("patient_id", value: patientId)
+            .order("administered_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func createAssessment(_ scale: AssessmentScale) async throws -> AssessmentScale {
+        try await supabase.from("assessment_scales")
+            .insert(scale)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    // 환자에게 척도검사 웹링크 발송 (진료실 밖 자가응답 — 미응답 상태로 생성)
+    func sendScaleLink(patientId: UUID, type: ScaleType) async throws -> AssessmentScale {
+        let scale = AssessmentScale(
+            id: UUID(), patient_id: patientId, chart_record_id: nil,
+            scale_type: type, administered_at: Date(),
+            raw_score: 0, subscores: [:],
+            method: .web_link, status: .sent,
+            ai_summary: nil, administered_by: nil, created_at: Date()
+        )
+        return try await createAssessment(scale)
+    }
+
     // MARK: - 오늘 정기심사 대상 환자 (정신건강복지법 §55)
 
     func fetchReviewsDueToday() async throws -> [Admission] {

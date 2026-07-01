@@ -6,6 +6,7 @@ struct PatientChartView: View {
     @State private var records: [ChartRecord] = []
     @State private var admissions: [Admission] = []
     @State private var prescriptions: [Prescription] = []
+    @State private var scales: [AssessmentScale] = []
     @State private var showNewRecord = false
 
     var body: some View {
@@ -28,12 +29,22 @@ struct PatientChartView: View {
 
             // 탭 내용
             switch vm.selectedTab {
+            case .timeline:
+                TimelineView(patient: patient, records: records, scales: scales,
+                             prescriptions: prescriptions, admissions: admissions)
             case .chart:
                 ChartRecordListView(records: records, patient: patient)
+            case .assessment:
+                AssessmentView(patient: patient, scales: scales) { type in
+                    Task { await sendLink(type) }
+                }
             case .admission:
                 AdmissionView(patient: patient, admissions: admissions)
             case .prescription:
-                PrescriptionListView(patient: patient, prescriptions: prescriptions)
+                PrescriptionListView(patient: patient, prescriptions: prescriptions,
+                                     canRepeat: vm.canPrescribe) {
+                    Task { await repeatPrescription() }
+                }
             case .psychology:
                 PsychologyView(patient: patient, records: records.filter { $0.record_type == .psychology })
             }
@@ -56,7 +67,23 @@ struct PatientChartView: View {
         async let r = HospitalRepository.shared.fetchChartRecords(patientId: patient.id)
         async let a = HospitalRepository.shared.fetchAdmissions(patientId: patient.id)
         async let p = HospitalRepository.shared.fetchPrescriptions(patientId: patient.id)
-        (records, admissions, prescriptions) = (try! await r, try! await a, try! await p)
+        async let s = HospitalRepository.shared.fetchAssessments(patientId: patient.id)
+        (records, admissions, prescriptions, scales) =
+            (try! await r, try! await a, try! await p, try! await s)
+    }
+
+    // 척도검사 웹링크 발송 (진료실 밖 자가응답)
+    private func sendLink(_ type: ScaleType) async {
+        _ = try? await HospitalRepository.shared.sendScaleLink(patientId: patient.id, type: type)
+        scales = (try? await HospitalRepository.shared.fetchAssessments(patientId: patient.id)) ?? scales
+    }
+
+    // 과거 처방 반복 (재서명 필요한 draft 로 복제)
+    private func repeatPrescription() async {
+        guard let staffId = vm.currentStaff?.id else { return }
+        _ = try? await HospitalRepository.shared.repeatLastPrescription(
+            patientId: patient.id, prescriberId: staffId)
+        prescriptions = (try? await HospitalRepository.shared.fetchPrescriptions(patientId: patient.id)) ?? prescriptions
     }
 }
 
@@ -165,22 +192,42 @@ struct SOAPSection: View {
 struct PrescriptionListView: View {
     let patient: Patient
     let prescriptions: [Prescription]
+    var canRepeat: Bool = false
+    var onRepeat: () -> Void = {}
+
     var body: some View {
-        if prescriptions.isEmpty {
-            ContentUnavailableView("처방 내역 없음", systemImage: "pills")
-        } else {
-            List(prescriptions) { rx in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(rx.prescribed_at, style: .date).font(.headline)
-                        Spacer()
-                        Text(rx.status.label)
-                            .font(.caption)
-                            .foregroundStyle(rx.status == .signed ? .green : .orange)
-                    }
-                    ForEach(rx.medications) { med in
-                        Text("• \(med.drug_name) \(med.dose) \(med.route.label) \(med.frequency) \(med.days)일")
-                            .font(.caption)
+        VStack(spacing: 0) {
+            // 과거 처방 반복 바 (TrueDoc Mental: 반복 처방 빠른 입력 참조)
+            if canRepeat && !prescriptions.isEmpty {
+                HStack {
+                    Image(systemName: "arrow.clockwise").foregroundStyle(AppColor.accent)
+                    Text("직전 처방을 복제해 새 처방(미서명)으로 불러옵니다.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("과거 처방 불러오기", action: onRepeat)
+                        .buttonStyle(.bordered)
+                }
+                .padding(12)
+                .background(AppColor.accent.opacity(0.06))
+                Divider()
+            }
+
+            if prescriptions.isEmpty {
+                ContentUnavailableView("처방 내역 없음", systemImage: "pills")
+            } else {
+                List(prescriptions) { rx in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(rx.prescribed_at, style: .date).font(.headline)
+                            Spacer()
+                            Text(rx.status.label)
+                                .font(.caption)
+                                .foregroundStyle(rx.status == .signed ? .green : .orange)
+                        }
+                        ForEach(rx.medications) { med in
+                            Text("• \(med.drug_name) \(med.dose) \(med.route.label) \(med.frequency) \(med.days)일")
+                                .font(.caption)
+                        }
                     }
                 }
             }
