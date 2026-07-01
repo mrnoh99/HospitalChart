@@ -33,9 +33,15 @@ HospitalChart/
   ViewModel/     HospitalViewModel (ObservableObject)
   Supabase/      SupabaseClient · HospitalRepository
   Design/        AppDesign (색상·폰트·공통 컴포넌트)
-supabase/        01_schema → 02_rls → 03_audit_log → 04_seeds 순 실행
+supabase/        01_schema → 02_rls → 03_audit_log → 04_seeds → 05_scale_requests 순 실행
 docs/            의료법_준수사항.md
 ```
+
+### 환자앱(PTCommunication) 척도 연동 — 대기 중 자가응답
+- **흐름**: 척도검사 탭 **환자앱 요청**(NDS/NAS/NSS) → 환자가 대기 중 PTComm '설문' 탭에서 응답·제출 → 척도검사 탭 **환자앱 제출 n건 반영 대기** → **차트에 반영**(`assessment_scales`, method=`patient_app`).
+- **공유 테이블** `scale_requests`(`supabase/05_scale_requests.sql`) — 연결 키 `chart_number`. PTCommunication `03_scales.sql` 과 동일 스키마(같은 Supabase 프로젝트 공유·동기화 전제).
+- 코드: `HospitalRepository.requestPatientScale` / `fetchSubmittedScaleRequests` / `importScaleRequest`.
+- **낙인 방지**: 환자앱은 점수·해석 미표시. 판정은 병원 차트에서만.
 
 ### 진료차트 탭 순서 (PatientChartView)
 `타임라인`(기본) · `진료기록`(SOAP) · `척도검사` · `입원` · `처방` · `심리`

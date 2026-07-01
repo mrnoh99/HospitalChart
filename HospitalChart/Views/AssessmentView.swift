@@ -11,7 +11,10 @@ struct AssessmentView: View {
     @EnvironmentObject private var vm: HospitalViewModel
     let patient: Patient
     let scales: [AssessmentScale]
+    var submittedRequests: [ScaleRequest] = []
     var onSendLink: (ScaleType) -> Void = { _ in }
+    var onRequestApp: (NationalScale) -> Void = { _ in }
+    var onImport: (ScaleRequest) -> Void = { _ in }
     var onReload: () -> Void = {}
 
     @State private var entryScale: NationalScale?
@@ -27,7 +30,14 @@ struct AssessmentView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
                 // 발송·직접시행 바
-                ScaleSendBar(onSend: onSendLink, onEnter: { entryScale = $0 })
+                ScaleSendBar(onSend: onSendLink,
+                             onEnter: { entryScale = $0 },
+                             onRequestApp: onRequestApp)
+
+                // 환자앱 제출본 반영 대기
+                if !submittedRequests.isEmpty {
+                    SubmittedRequestsBar(requests: submittedRequests, onImport: onImport)
+                }
 
                 if scales.isEmpty {
                     ContentUnavailableView("척도검사 없음", systemImage: "list.clipboard",
@@ -52,6 +62,7 @@ struct AssessmentView: View {
 struct ScaleSendBar: View {
     var onSend: (ScaleType) -> Void
     var onEnter: (NationalScale) -> Void
+    var onRequestApp: (NationalScale) -> Void
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "list.clipboard")
@@ -59,6 +70,16 @@ struct ScaleSendBar: View {
             Text("척도검사")
                 .font(.subheadline.bold())
             Spacer()
+            // 환자앱(PTCommunication)으로 요청 → 대기 중 환자가 응답 → 차트 반영
+            Menu {
+                ForEach(NationalScale.allCases) { scale in
+                    Button(scale.title) { onRequestApp(scale) }
+                }
+            } label: {
+                Label("환자앱 요청", systemImage: "iphone")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
             // 한국인 정신건강 척도 직접 시행 (문항 입력·자동 해석)
             Menu {
                 ForEach(NationalScale.allCases) { scale in
@@ -69,19 +90,50 @@ struct ScaleSendBar: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            // 진료실 밖 자가응답용 웹링크
+            // 진료실 밖 자가응답용 웹링크 (기타 국제 척도 포함)
             Menu {
                 ForEach(ScaleType.allCases, id: \.self) { type in
                     Button(type.label) { onSend(type) }
                 }
             } label: {
-                Label("웹링크 발송", systemImage: "link")
+                Label("웹링크", systemImage: "link")
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
         }
         .padding(12)
         .background(AppColor.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// 환자앱 제출본 반영 대기 바
+struct SubmittedRequestsBar: View {
+    let requests: [ScaleRequest]
+    var onImport: (ScaleRequest) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "iphone.and.arrow.forward")
+                    .foregroundStyle(AppColor.success)
+                Text("환자앱 제출 \(requests.count)건 — 차트 반영 대기")
+                    .font(.subheadline.bold())
+            }
+            ForEach(requests) { req in
+                HStack {
+                    Text(NationalScale(rawValue: req.scale_type)?.title ?? req.scale_type)
+                        .font(.callout)
+                    if let s = req.submitted_at {
+                        Text(s, style: .date).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("차트에 반영") { onImport(req) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                }
+            }
+        }
+        .padding(12)
+        .background(AppColor.success.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

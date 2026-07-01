@@ -27,15 +27,17 @@ struct AssessmentScale: Identifiable, Codable {
     enum AdministrationMethod: String, Codable, CaseIterable {
         case tablet = "tablet"          // 태블릿 (진료실)
         case web_link = "web_link"      // 웹링크 (진료실 밖, 스마트폰/PC)
+        case patient_app = "patient_app" // 환자앱 (PTCommunication 대기 중 응답)
         case paper = "paper"            // 지필
         case interview = "interview"    // 면담 평정
 
         var label: String {
             switch self {
-            case .tablet:    return "태블릿"
-            case .web_link:  return "웹링크"
-            case .paper:     return "지필"
-            case .interview: return "면담평정"
+            case .tablet:      return "태블릿"
+            case .web_link:    return "웹링크"
+            case .patient_app: return "환자앱"
+            case .paper:       return "지필"
+            case .interview:   return "면담평정"
             }
         }
     }
@@ -53,6 +55,21 @@ struct AssessmentScale: Identifiable, Codable {
             }
         }
     }
+}
+
+// 환자앱(PTCommunication) 척도 요청·제출 (chart_number 로 연결)
+// 병원이 requested 로 요청 → 환자가 대기 중 응답 submitted → 병원이 imported 처리
+struct ScaleRequest: Identifiable, Codable {
+    let id: UUID
+    var chart_number: String
+    var scale_type: String          // NDS / NAS / NSS
+    var status: String              // requested / submitted / imported
+    var item_responses: [Int]?
+    var raw_score: Int?
+    var requested_by: UUID?
+    var requested_at: Date?
+    var submitted_at: Date?
+    var created_at: Date
 }
 
 // 심각도 밴드

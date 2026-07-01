@@ -231,6 +231,58 @@ class HospitalRepository {
         return try await createAssessment(scale)
     }
 
+    // MARK: - 환자앱(PTCommunication) 척도 요청·수신
+
+    // 대기 중 환자에게 척도 응답 요청 (환자앱 '설문' 탭에 표시됨)
+    func requestPatientScale(chartNumber: String, type: NationalScale, staffId: UUID) async throws {
+        struct NewRequest: Encodable {
+            let chart_number: String
+            let scale_type: String
+            let status: String
+            let requested_by: String
+        }
+        try await supabase.from("scale_requests")
+            .insert(NewRequest(chart_number: chartNumber,
+                               scale_type: type.rawValue,
+                               status: "requested",
+                               requested_by: staffId.uuidString))
+            .execute()
+    }
+
+    // 환자가 제출한 척도 응답 조회 (차트에 반영 대기)
+    func fetchSubmittedScaleRequests(chartNumber: String) async throws -> [ScaleRequest] {
+        try await supabase.from("scale_requests")
+            .select()
+            .eq("chart_number", value: chartNumber)
+            .eq("status", value: "submitted")
+            .order("submitted_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    // 제출본을 차트(assessment_scales)에 반영 후 imported 처리
+    func importScaleRequest(_ req: ScaleRequest, patientId: UUID, staffId: UUID) async throws {
+        guard let type = ScaleType(rawValue: req.scale_type) else { return }
+        let responses = req.item_responses ?? []
+        var subscores: [String: Int] = [:]
+        for (i, v) in responses.enumerated() { subscores["q\(i + 1)"] = v }
+
+        let scale = AssessmentScale(
+            id: UUID(), patient_id: patientId, chart_record_id: nil,
+            scale_type: type,
+            administered_at: req.submitted_at ?? Date(),
+            raw_score: req.raw_score ?? responses.reduce(0, +),
+            subscores: subscores,
+            method: .patient_app, status: .reviewed,
+            ai_summary: nil, administered_by: staffId, created_at: Date()
+        )
+        _ = try await createAssessment(scale)
+        try await supabase.from("scale_requests")
+            .update(["status": "imported"])
+            .eq("id", value: req.id)
+            .execute()
+    }
+
     // MARK: - 오늘 정기심사 대상 환자 (정신건강복지법 §55)
 
     func fetchReviewsDueToday() async throws -> [Admission] {

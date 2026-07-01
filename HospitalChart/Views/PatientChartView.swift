@@ -7,6 +7,7 @@ struct PatientChartView: View {
     @State private var admissions: [Admission] = []
     @State private var prescriptions: [Prescription] = []
     @State private var scales: [AssessmentScale] = []
+    @State private var submittedRequests: [ScaleRequest] = []
     @State private var showNewRecord = false
 
     var body: some View {
@@ -36,7 +37,10 @@ struct PatientChartView: View {
                 ChartRecordListView(records: records, patient: patient)
             case .assessment:
                 AssessmentView(patient: patient, scales: scales,
+                               submittedRequests: submittedRequests,
                                onSendLink: { type in Task { await sendLink(type) } },
+                               onRequestApp: { scale in Task { await requestApp(scale) } },
+                               onImport: { req in Task { await importRequest(req) } },
                                onReload: { Task { await reloadScales() } })
             case .admission:
                 AdmissionView(patient: patient, admissions: admissions)
@@ -70,6 +74,25 @@ struct PatientChartView: View {
         async let s = HospitalRepository.shared.fetchAssessments(patientId: patient.id)
         (records, admissions, prescriptions, scales) =
             (try! await r, try! await a, try! await p, try! await s)
+        submittedRequests =
+            (try? await HospitalRepository.shared.fetchSubmittedScaleRequests(chartNumber: patient.chart_number)) ?? []
+    }
+
+    // 환자앱(PTCommunication)으로 척도 응답 요청
+    private func requestApp(_ scale: NationalScale) async {
+        guard let staffId = vm.currentStaff?.id else { return }
+        try? await HospitalRepository.shared.requestPatientScale(
+            chartNumber: patient.chart_number, type: scale, staffId: staffId)
+    }
+
+    // 환자 제출본을 차트에 반영
+    private func importRequest(_ req: ScaleRequest) async {
+        guard let staffId = vm.currentStaff?.id else { return }
+        try? await HospitalRepository.shared.importScaleRequest(
+            req, patientId: patient.id, staffId: staffId)
+        await reloadScales()
+        submittedRequests =
+            (try? await HospitalRepository.shared.fetchSubmittedScaleRequests(chartNumber: patient.chart_number)) ?? []
     }
 
     // 척도검사 웹링크 발송 (진료실 밖 자가응답)
