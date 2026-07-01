@@ -1,0 +1,4 @@
+# HospitalChart — Supabase 설정 예시
+# 실제 값 입력 후 local.properties 로 복사 (gitignore에 포함)
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...

@@ -1,0 +1,16 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.xcworkspace
+!default.xcworkspace
+.build/
+DerivedData/
+
+# Keys (절대 커밋 금지)
+local.properties
+*.p12
+*.p8
+GoogleService-Info.plist
+
+# macOS
+.DS_Store
