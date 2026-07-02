@@ -33,9 +33,16 @@ HospitalChart/
   ViewModel/     HospitalViewModel (ObservableObject)
   Supabase/      SupabaseClient · HospitalRepository
   Design/        AppDesign (색상·폰트·공통 컴포넌트)
-supabase/        01_schema → 02_rls → 03_audit_log → 04_seeds → 05_scale_requests 순 실행
-docs/            의료법_준수사항.md
+supabase/        01_schema → 02_rls → 03_audit_log → 04_seeds → 05_scale_requests → 06_backup_audit 순 실행
+ops/backup/      pg_backup.sh · restore_verify.sh · kms_wrap/unwrap.sh · backup.env.example
+docs/            의료법_준수사항.md · 백업_복구_설계.md
 ```
+
+### 데이터 백업·복구 (docs/백업_복구_설계.md)
+- 전제: **Supabase Cloud(PITR) + 국내 오프사이트** 이중 보관, 대상=Postgres DB.
+- 3계층: PITR(초 단위) · 국내 일/주/월 오프사이트 · 국내 연 아카이브(Object Lock, 10년+ §22).
+- 암호화 AES-256 봉투암호화(국내 KMS) + 전송 TLS + **주간 복구검증**(`restore_verify.sh`).
+- 백업 이력 `backup_runs`(06_backup_audit.sql, 삭제 불가·superadmin 열람) + 무결성 스냅샷 함수.
 
 ### 환자앱(PTCommunication) 척도 연동 — 대기 중 자가응답
 - **흐름**: 척도검사 탭 **환자앱 요청**(NDS/NAS/NSS) → 환자가 대기 중 PTComm '설문' 탭에서 응답·제출 → 척도검사 탭 **환자앱 제출 n건 반영 대기** → **차트에 반영**(`assessment_scales`, method=`patient_app`).
